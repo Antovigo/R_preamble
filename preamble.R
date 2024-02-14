@@ -74,7 +74,7 @@ binom_post_a = function(k, n, prior_a = binom_def_prior_a, prior_b = binom_def_p
 binom_post_b = function(k, n, prior_a = binom_def_prior_a, prior_b = binom_def_prior_b, ...) prior_b + sum(n - k)
 binom_post_mean = function(k, n, ...) binom_post_a(k, n, ...) / (binom_post_a(k, n, ...) + binom_post_b(k, n, ...))
 binom_hdi_low = function(k, n, conf = 0.95, ...) hdi(qbeta, conf, shape1 = binom_post_a(k, n, ...), shape2 = binom_post_b(k, n, ...))[1]
-binom_hdi_high = function(a, b, conf = 0.95, ...) hdi(qbeta, conf, shape1 = binom_post_a(k, n, ...), shape2 = binom_post_b(k, n, ...))[2]
+binom_hdi_high = function(k, n, conf = 0.95, ...) hdi(qbeta, conf, shape1 = binom_post_a(k, n, ...), shape2 = binom_post_b(k, n, ...))[2]
 
 # Closed-form Gamma-Poisson
 poisson_def_prior_a = 0.0
