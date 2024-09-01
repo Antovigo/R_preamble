@@ -33,18 +33,20 @@ bin_center = function(x){
 # Axes
 pretty_log_breaks = function(x) unique(10^(seq(floor(min(log10(x))) - 1, ceiling(max(log10(x))) + 1, 1)))
 
-xlog = function(lower = NULL, upper = NULL, ...){ return(scale_x_continuous(limits = c(lower, upper), trans = log10_trans(), labels = trans_format("log10", math_format(10^.x)), expand = c(0,0), ...))}
-ylog = function(lower = NULL, upper = NULL, ...){ return(scale_y_continuous(limits = c(lower, upper), trans = log10_trans(), labels = trans_format("log10", math_format(10^.x)), expand = c(0,0), ...))}
+xlog = function(lower = NULL, upper = NULL, expand = c(0,0), ...){ return(scale_x_continuous(limits = c(lower, upper), trans = log10_trans(), labels = trans_format("log10", math_format(10^.x)), expand = expand, ...))}
+ylog = function(lower = NULL, upper = NULL, expand = c(0,0), ...){ return(scale_y_continuous(limits = c(lower, upper), trans = log10_trans(), labels = trans_format("log10", math_format(10^.x)), expand = expand, ...))}
 logticks = function(s = 'bl', lw = 0.2, ...) annotation_logticks(sides = s, linewidth = lw, ...)
 
-xcont = function(lower = NULL, upper = NULL, ...){ return(scale_x_continuous(limits = c(lower, upper), expand = c(0, 0), ...))}
-ycont = function(lower = NULL, upper = NULL, ...){ return(scale_y_continuous(limits = c(lower, upper), expand = c(0, 0), ...))}
+xcont = function(lower = NULL, upper = NULL, expand = c(0, 0), ...){ return(scale_x_continuous(limits = c(lower, upper), expand = expand, ...))}
+ycont = function(lower = NULL, upper = NULL, expand = c(0, 0), ...){ return(scale_y_continuous(limits = c(lower, upper), expand = expand, ...))}
 
 # Titled axis text
 tilt_text = function(angle = -45, hjust = 0.1, vjust = 0.1, size = 8) theme(axis.text.x = element_text(angle = angle, hjust = hjust, vjust = vjust, size = size)) 
 
+### Jupyter tricks ###
+
 # Plot size
-size=function(h,w){
+size = function(h,w){
 	plot_h <<- h
 	plot_w <<- w
 	options(repr.plot.width=w, repr.plot.height=h, repr.plot.res=300)
@@ -52,12 +54,19 @@ size=function(h,w){
 
 size(2.5, 3.5)
 
+# Display more columns
+maxcols = function(n){ options(repr.matrix.max.cols=n) }
+maxcols(150)
+
+# Extra margin (for long legends that get cut out)
+plot_margin = function(right = 0, left = 0, top = 0, bottom = 0) theme(plot.margin = unit(c(top, right, bottom, left), "lines"))
+
 # Simple width and height function with sane defaults
 wide = function(){size(plot_h, 8)}
 narrow = function(){size(plot_h, 3.5)}
 tall = function(){size(5, plot_w)}
 short = function(){size(2.5, plot_w)}
-square = function(){size(2.5, 2.5)}
+big = function(){size(4.5, 8.5)}
 
 library(tools)
 
@@ -147,6 +156,15 @@ norm_post_NIG = function(x, prior_mu, prior_sigma, conf = def_conf, prior_alpha 
 norm_post_mu = function(x, prior_mu, prior_sigma, prior_alpha = 1) norm_post_NIG(x, prior_mu, prior_sigma, prior_alpha = prior_alpha)[1]
 norm_post_low = function(x, prior_mu, prior_sigma, prior_alpha = 1) norm_post_NIG(x, prior_mu, prior_sigma, prior_alpha = prior_alpha)[2]
 norm_post_high = function(x, prior_mu, prior_sigma, prior_alpha = 1) norm_post_NIG(x, prior_mu, prior_sigma, prior_alpha = prior_alpha)[3]
+
+#########################
+# Convenience functions #
+#########################
+
+lw = 1
+lines <- function(...) geom_line(linewidth = 0.3 * lw, ...)
+circles <- function(...) geom_point(pch = 21, fill = 'white', stroke = 0.5 * lw, ...)
+ribbon <- function(...) geom_ribbon(col = NA, alpha = 0.2)
 
 ##############
 ### Ricing ###
