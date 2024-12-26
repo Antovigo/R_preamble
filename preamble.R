@@ -4,13 +4,15 @@ suppressMessages(library(vroom))
 suppressMessages(library(lubridate))
 suppressMessages(library(scales))
 suppressMessages(library(patchwork))
-suppressMessages(library(binom))
 
 # Shortcut functions
 read.tsv = function(file){read.csv(file, sep = '\t')}
 write.tsv = function(df, name){write.table(df, name, row.names = F, quote = F, sep = '\t')}
 nl = theme(legend.position='none') # no legend
 eb = element_blank() # for using the theme()
+
+b = 'black'
+w = 'white'
 
 headn = function(data, n = 3    ){
     # Show the top of a table and display the total number of rows
@@ -61,6 +63,15 @@ maxcols(150)
 # Extra margin (for long legends that get cut out)
 plot_margin = function(right = 0, left = 0, top = 0, bottom = 0) theme(plot.margin = unit(c(top, right, bottom, left), "lines"))
 
+# Annotate plot with arrows
+add_arrows = function(x, y, xend, yend, size = 1.2) {
+	annotate(
+		geom = 'segment', 
+		x = x, xend = xend, y = y, yend = yend,
+		arrow = arrow(type = 'closed', length = unit(size, 'mm')), linejoin = 'mitre', lineend = 'butt'
+	)
+}
+
 # Simple width and height function with sane defaults
 wide = function(){size(plot_h, 8)}
 narrow = function(){size(plot_h, 3.5)}
@@ -105,26 +116,44 @@ library(HDInterval) # highest density credible intervals
 # Closed-form Beta-binomial posterior parameter estimates. k and n may/may not be vectors. (1,1): uniform prior. (0.5,0.5): Jeffreys prior.
 binom_def_prior_a = 0.5
 binom_def_prior_b = 0.5
-def_conf = 0.99
 
 binom_post_a = function(k, n, prior_a = binom_def_prior_a, prior_b = binom_def_prior_b, ...) prior_a + sum(k)
 binom_post_b = function(k, n, prior_a = binom_def_prior_a, prior_b = binom_def_prior_b, ...) prior_b + sum(n - k)
 binom_post_mean = function(k, n, ...) binom_post_a(k, n, ...) / (binom_post_a(k, n, ...) + binom_post_b(k, n, ...))
-binom_hdi_low = function(k, n, conf = def_conf, ...) hdi(qbeta, conf, shape1 = binom_post_a(k, n, ...), shape2 = binom_post_b(k, n, ...))[1]
-binom_hdi_high = function(k, n, conf = def_conf, ...) hdi(qbeta, conf, shape1 = binom_post_a(k, n, ...), shape2 = binom_post_b(k, n, ...))[2]
+binom_hdi_low = function(k, n, conf, ...) hdi(qbeta, conf, shape1 = binom_post_a(k, n, ...), shape2 = binom_post_b(k, n, ...))[1]
+binom_hdi_high = function(k, n, conf, ...) hdi(qbeta, conf, shape1 = binom_post_a(k, n, ...), shape2 = binom_post_b(k, n, ...))[2]
 
 # Closed-form Gamma-Poisson
 poisson_def_prior_a = 0.0
 poisson_def_prior_b = 0.0
 
 poisson_post_a = function(k, prior_a = poisson_def_prior_a, prior_b = poisson_def_prior_b, ...) prior_a + sum(k)
-poisson_post_b = function(k, prior_a = poisson_def_prior_a, prior_b = poisson_def_prior_b, ...) prior_b + length(k)
+poisson_post_b = function(k, prior_a = poisson_def_prior_a, prior_b = poisson_def_prior_b, exposures = ...) prior_b + length(k)
 poisson_post_mean = function(k, prior_a = poisson_def_prior_a, prior_b = poisson_def_prior_b, ...) poisson_post_a(k, ...) / poisson_post_b(k, ...)
-poisson_hdi_low = function(k, conf = 0.95, ...) hdi(qgamma, conf, shape = poisson_post_a(k, ...), rate = poisson_post_b(k, ...))[1]
-poisson_hdi_high = function(k, conf = 0.95, ...) hdi(qgamma, conf, shape = poisson_post_a(k, ...), rate = poisson_post_b(k, ...))[2]
+poisson_hdi_low = function(k, conf, ...) hdi(qgamma, conf, shape = poisson_post_a(k, ...), rate = poisson_post_b(k, ...))[1]
+poisson_hdi_high = function(k, conf, ...) hdi(qgamma, conf, shape = poisson_post_a(k, ...), rate = poisson_post_b(k, ...))[2]
+
+# Better version, allows for exposures. Sets the column names itself.
+poisson_gamma_post <- function(y, exposures = NULL, alpha = 0, beta = 0) {
+  
+  # If exposure is NULL, assume exposure time is 1 for all observations
+  if (is.null(exposures)) {
+    exposures <- rep(1, length(y))
+  }
+  
+  # Calculate posterior shape (alpha) and rate (beta) (https://statproofbook.github.io/P/poissexp-post.html)
+  posterior_alpha <- alpha + sum(y)
+  posterior_beta <- beta + sum(exposures)
+  return(tibble("alpha" = posterior_alpha, "beta" = posterior_beta))
+}
+
+poisson_gamma_hdi <- function(alpha, beta, conf) {
+    hdi_interval = hdi(qgamma, conf, shape = alpha, rate = beta)
+    return(tibble("r" = alpha / beta, "rmin" = hdi_interval[1], "rmax" = hdi_interval[2]))
+}
 
 # Normal-inverse-gamma updating. Mean ~ N(mu, sigma), Var ~ IG(alpha, beta)
-norm_post_NIG = function(x, prior_mu, prior_sigma, conf = def_conf, prior_alpha = 1){
+norm_post_NIG = function(x, prior_mu, prior_sigma, conf, prior_alpha = 1){
 
     # Calculate the posterior parameters
     n <- length(x)
@@ -153,9 +182,9 @@ norm_post_NIG = function(x, prior_mu, prior_sigma, conf = def_conf, prior_alpha 
     return(c(post_mu, post_mu_low, post_mu_high))
 }
 
-norm_post_mu = function(x, prior_mu, prior_sigma, prior_alpha = 1) norm_post_NIG(x, prior_mu, prior_sigma, prior_alpha = prior_alpha)[1]
-norm_post_low = function(x, prior_mu, prior_sigma, prior_alpha = 1) norm_post_NIG(x, prior_mu, prior_sigma, prior_alpha = prior_alpha)[2]
-norm_post_high = function(x, prior_mu, prior_sigma, prior_alpha = 1) norm_post_NIG(x, prior_mu, prior_sigma, prior_alpha = prior_alpha)[3]
+norm_post_mu = function(x, prior_mu, prior_sigma, conf, prior_alpha = 1) norm_post_NIG(x, prior_mu, prior_sigma, prior_alpha = prior_alpha, conf)[1]
+norm_post_low = function(x, prior_mu, prior_sigma, conf, prior_alpha = 1) norm_post_NIG(x, prior_mu, prior_sigma, prior_alpha = prior_alpha, conf)[2]
+norm_post_high = function(x, prior_mu, prior_sigma, conf, prior_alpha = 1) norm_post_NIG(x, prior_mu, prior_sigma, prior_alpha = prior_alpha, conf)[3]
 
 #########################
 # Convenience functions #
@@ -239,16 +268,15 @@ scale_fill_def = function(...){
     scale_fill_gradientn(colors = wes_palette('Zissou1'), ...)
 }
 
-# Set default colors
-library(wesanderson)
-def_col_d = function(){return (scale_color_adaptive(wes_palette('Zissou1')))}
-def_col_c = function(){return (scale_color_gradientn(colors = wes_palette("Zissou1")))}
-def_fill_d = function(){return (scale_fill_adaptive(wes_palette('Zissou1')))}
-def_fill_c = function(){return (scale_fill_gradientn(colors = wes_palette("Zissou1")))}
 
-# Manual access
+# Default color palette (Zissou1 from https://emilhvitfeldt.github.io/r-color-palettes/discrete/wesanderson/Zissou1/) 
 Zissou1 = c("#3B9AB2", "#78B7C5", "#EBCC2A", "#E1AF00", "#F21A00")
 pal = c("#3B9AB2", "#78B7C5", "#EBCC2A", "#E1AF00", "#F21A00")
+
+def_col_d = function(){return (scale_color_adaptive(Zissou1))}
+def_col_c = function(){return (scale_color_gradientn(colors = Zissou1))}
+def_fill_d = function(){return (scale_fill_adaptive(Zissou1))}
+def_fill_c = function(){return (scale_fill_gradientn(colors = Zissou1))}
 
 options(
   ggplot2.discrete.colour = def_col_d, ggplot2.continuous.colour = def_col_c,
