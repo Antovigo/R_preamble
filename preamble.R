@@ -6,7 +6,7 @@ suppressMessages(library(scales))
 suppressMessages(library(patchwork))
 
 # Shortcut functions
-read.tsv = function(file){read.csv(file, sep = '\t')}
+read.tsv = function(file, ...){read.csv(file, sep = '\t', ...)}
 write.tsv = function(df, name){write.table(df, name, row.names = F, quote = F, sep = '\t')}
 nl = theme(legend.position='none') # no legend
 eb = element_blank() # for using the theme()
@@ -45,6 +45,9 @@ ycont = function(lower = NULL, upper = NULL, expand = c(0, 0), ...){ return(scal
 # Titled axis text
 tilt_text = function(angle = -45, hjust = 0.1, vjust = 0.1, size = 8) theme(axis.text.x = element_text(angle = angle, hjust = hjust, vjust = vjust, size = size)) 
 
+small_titles = theme(axis.title = element_text(size=10))
+small_text = theme(axis.text = element_text(size=8))
+
 ### Jupyter tricks ###
 
 # Plot size
@@ -64,13 +67,26 @@ maxcols(150)
 plot_margin = function(right = 0, left = 0, top = 0, bottom = 0) theme(plot.margin = unit(c(top, right, bottom, left), "lines"))
 
 # Annotate plot with arrows
-add_arrows = function(x, y, xend, yend, size = 1.2) {
+add_arrows = function(x, y, xend, yend, size = 1.2, ...) {
 	annotate(
 		geom = 'segment', 
 		x = x, xend = xend, y = y, yend = yend,
-		arrow = arrow(type = 'closed', length = unit(size, 'mm')), linejoin = 'mitre', lineend = 'butt'
+		arrow = arrow(type = 'closed', length = unit(size, 'mm')), linejoin = 'mitre', lineend = 'butt',
+		...
 	)
 }
+
+add_text = function(x, y, label, ...) {
+	annotate(
+		 geom = 'text',
+		 label = label,
+		 x = x, y = y, ...
+	)
+}
+
+# Use only the labels as the X axis title
+no_x_title = function(size = 10) theme(axis.title.x = eb, axis.text.x = element_text(color = b, size = size))
+no_y_title = function(size = 10) theme(axis.title.y = eb, axis.text.y = element_text(color = b, size = size))
 
 # Simple width and height function with sane defaults
 wide = function(){size(plot_h, 8)}
@@ -85,10 +101,16 @@ psave <- function(name) {
   # Extract folder name from the path
   folder <- dirname(name)
   
-  # Check if "PNG" folder exists, if not create it
+  # Check if "PDF" folder exists, if not create it
   pdf_folder <- file.path(folder, "PDF")
   if (!file.exists(pdf_folder)) {
     dir.create(pdf_folder)
+  }
+
+  # Check if "GG" folder exists, if not create it
+  gg_folder <- file.path(folder, "GG")
+  if (!file.exists(gg_folder)) {
+    dir.create(gg_folder)
   }
     
   # Extract plot name
@@ -98,12 +120,16 @@ psave <- function(name) {
   png_path <- file.path(folder, paste0(plot_name, ".png"))
   ggsave(png_path, width=plot_w, height=plot_h, dpi = 300, device = "png")
   
-  # Save plot as PNG in the "PNG" folder
+  # Save plot as PDF in the "PDF" folder
   pdf_path <- file.path(pdf_folder, paste0(plot_name, ".pdf"))
   ggsave(pdf_path, width=plot_w, height=plot_h, dpi = 300, device = cairo_pdf)
+
+  # Save plot data as RDS in the "GG" folder
+  gg_path <- file.path(gg_folder, paste0(plot_name, ".rds"))
+  saveRDS(last_plot(), file = gg_path)
 }
 
-psave_only=function(name){
+isave =function(name){
 	ggsave(name, width=plot_w, height=plot_h, dpi = 300)
 }
 
@@ -149,7 +175,7 @@ poisson_gamma_post <- function(y, exposures = NULL, alpha = 0, beta = 0) {
 
 poisson_gamma_hdi <- function(alpha, beta, conf) {
     hdi_interval = hdi(qgamma, conf, shape = alpha, rate = beta)
-    return(tibble("r" = alpha / beta, "rmin" = hdi_interval[1], "rmax" = hdi_interval[2]))
+    return(tibble("r" = alpha / beta, "sd_r" = sqrt(alpha / (beta^2)), "rmin" = hdi_interval[1], "rmax" = hdi_interval[2]))
 }
 
 # Normal-inverse-gamma updating. Mean ~ N(mu, sigma), Var ~ IG(alpha, beta)
@@ -179,12 +205,12 @@ norm_post_NIG = function(x, prior_mu, prior_sigma, conf, prior_alpha = 1){
     post_mu_low <- qt(conf_tail, df = 2 * post_alpha) * scale + post_mu
     post_mu_high <- qt(1 - conf_tail, df = 2 * post_alpha) * scale + post_mu
 
-    return(c(post_mu, post_mu_low, post_mu_high))
+    return(tibble('post_mu' = post_mu, 'post_sigma' = post_sigma, 'post_mu_low' =  post_mu_low, 'post_mu_high' =  post_mu_high))
 }
 
-norm_post_mu = function(x, prior_mu, prior_sigma, conf, prior_alpha = 1) norm_post_NIG(x, prior_mu, prior_sigma, prior_alpha = prior_alpha, conf)[1]
-norm_post_low = function(x, prior_mu, prior_sigma, conf, prior_alpha = 1) norm_post_NIG(x, prior_mu, prior_sigma, prior_alpha = prior_alpha, conf)[2]
-norm_post_high = function(x, prior_mu, prior_sigma, conf, prior_alpha = 1) norm_post_NIG(x, prior_mu, prior_sigma, prior_alpha = prior_alpha, conf)[3]
+#norm_post_mu = function(x, prior_mu, prior_sigma, conf, prior_alpha = 1) norm_post_NIG(x, prior_mu, prior_sigma, prior_alpha = prior_alpha, conf)[1]
+#norm_post_low = function(x, prior_mu, prior_sigma, conf, prior_alpha = 1) norm_post_NIG(x, prior_mu, prior_sigma, prior_alpha = prior_alpha, conf)[2]
+#norm_post_high = function(x, prior_mu, prior_sigma, conf, prior_alpha = 1) norm_post_NIG(x, prior_mu, prior_sigma, prior_alpha = prior_alpha, conf)[3]
 
 #########################
 # Convenience functions #

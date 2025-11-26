@@ -4,7 +4,7 @@ grid_line_weight <- 0.1
 gridline <- 'grey60'
 
 text_colour <- 'black'
-text_size <- 12
+text_size <- 10
 
 half_line <- text_size / 2
 spacing <- 1
