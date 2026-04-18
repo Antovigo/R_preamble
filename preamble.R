@@ -277,11 +277,17 @@ pal_adaptive <- function(palette, alpha = 1, use_raw = FALSE) {
 #' @param ... additional parameters for [ggplot2::discrete_scale()].
 
 navalue = 'grey60'
-scale_color_adaptive <- function(palette, alpha = 1, use_raw = FALSE, ...) {
+scale_color_adaptive <- function(palette = Zissou1, alpha = 1, use_raw = FALSE, transform = NULL, ...) {
+  if (!is.null(transform)) {
+    return(scale_color_gradientn(colors = palette, transform = transform, na.value = navalue, ...))
+  }
   ggplot2::discrete_scale("colour", "adaptive", pal_adaptive(palette, alpha, use_raw = use_raw), na.value = navalue, ...)
 }
 
-scale_fill_adaptive <- function(palette, alpha = 1, use_raw = FALSE, ...) {
+scale_fill_adaptive <- function(palette = Zissou1, alpha = 1, use_raw = FALSE, transform = NULL, ...) {
+  if (!is.null(transform)) {
+    return(scale_fill_gradientn(colors = palette, transform = transform, na.value = navalue, ...))
+  }
   ggplot2::discrete_scale("fill", "adaptive", pal_adaptive(palette, alpha, use_raw = use_raw), na.value = navalue, ...)
 }
 
